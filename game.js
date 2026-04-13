@@ -2043,7 +2043,7 @@ class Level {
     playerDead() {
         this.player.delete = true;
         lives--;
-        if (lives > 0) setTimeout(() => { this.player = new Player(); }, 500);
+        if (lives > 0) setTimeout(() => { this.player = new Player(this); }, 500);
         else setTimeout(() => {
             gameOver = true;
         }, 500);
