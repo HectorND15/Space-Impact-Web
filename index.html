@@ -4,7 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#2d3641">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=VT323&display=swap" rel="stylesheet">
@@ -16,6 +19,11 @@
     <nav>
         <img src="./img/logo.png" alt="logo" id="logo">
     </nav>
+    <div id="username-bar">
+        <label for="username-input">Pilot name:</label>
+        <input id="username-input" type="text" maxlength="12" placeholder="anon" autocomplete="off">
+        <button id="username-save">Save</button>
+    </div>
     <div id="game">
         <canvas id="canvas-bg">Your browswer doesn't support HTML Canvas</canvas>
         <canvas id="canvas-main"></canvas>
@@ -48,6 +56,15 @@
             <h2 class="desc-head">Description:</h2>
             <p class="desc">Shoot down the enemy ships and survive all 8 levels.</p>
     </div>
+    <div id="rotate-warning">
+        <div id="username-bar-mobile">
+            <label for="username-input-mobile">Pilot name:</label>
+            <input id="username-input-mobile" type="text" maxlength="12" placeholder="anon" autocomplete="off">
+            <button id="username-save-mobile">Save</button>
+        </div>
+        <div class="rotate-icon">&#x21BB;</div>
+        <p>Rota tu dispositivo<br>para jugar</p>
+    </div>
     <div class="buttons-onscreen" oncontextmenu="return false">
         <button type="button" id="button-left" class="button"><img src="./img/buttonLeft.png" alt=""></button>
         <button type="button" id="button-up" class="button"><img src="./img/buttonUp.png" alt=""></button>
@@ -75,8 +92,57 @@
                 info.style.display = "inline-block";
             }
         });
+
+        // Auto-enable on-screen buttons on touch devices
+        const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        if (isTouch) {
+            toggleBar.classList.add("toggle-on");
+            toggleBall.classList.add("toggle-ball-on");
+            flag = true;
+            buttons.style.display = "inline-block";
+            info.style.display = "none";
+        }
+
+        // Request fullscreen on Play (mobile only)
+        document.getElementById("play").addEventListener("click", () => {
+            if (isTouch && document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(()=>{});
+                if (screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock("landscape").catch(()=>{});
+                }
+            }
+        });
+
+        // Prevent unwanted scroll/zoom gestures while playing
+        document.addEventListener("gesturestart", e => e.preventDefault());
+        document.addEventListener("touchmove", e => {
+            if (e.target.closest("#game, .buttons-onscreen")) e.preventDefault();
+        }, { passive: false });
     </script>
 
+    <script>
+        // Configure your deployed Cloudflare Worker URL here:
+        window.LEADERBOARD_URL = "";  // e.g. "https://space-impact-lb.yourname.workers.dev"
+
+        const usernameInput = document.getElementById("username-input");
+        const usernameSave = document.getElementById("username-save");
+        usernameInput.value = localStorage.getItem("si_username") || "";
+        const usernameInputM = document.getElementById("username-input-mobile");
+        const usernameSaveM = document.getElementById("username-save-mobile");
+        usernameInputM.value = localStorage.getItem("si_username") || "";
+
+        function saveUsername(v, btn) {
+            v = v.trim().slice(0, 12).replace(/[^\w\- ]/g, "");
+            if (!v) return;
+            localStorage.setItem("si_username", v);
+            usernameInput.value = v;
+            usernameInputM.value = v;
+            btn.textContent = "Saved";
+            setTimeout(() => btn.textContent = "Save", 1200);
+        }
+        usernameSave.addEventListener("click", () => saveUsername(usernameInput.value, usernameSave));
+        usernameSaveM.addEventListener("click", () => saveUsername(usernameInputM.value, usernameSaveM));
+    </script>
     <script src="game.js"></script>
 
 </body>

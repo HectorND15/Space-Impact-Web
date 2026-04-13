@@ -6,6 +6,16 @@
 body{
     background-color: #2d3641;
     overflow-x: hidden;
+    overscroll-behavior: none;
+}
+html, body {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+}
+canvas, .button, #pause-button, .ingame-button {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 /* ----------------Nav bar --------------*/
@@ -165,6 +175,99 @@ canvas {
     transform: translateX(20px);
 }
 
+/*----------- Username bar ------------*/
+#username-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px;
+    font-family: 'Silkscreen', monospace;
+    color: #aad69c;
+    background: #1f242b;
+}
+#username-bar label { font-size: 14px; }
+#username-input {
+    background: #2d3641;
+    color: #aad69c;
+    border: 2px solid #aad69c;
+    padding: 6px 10px;
+    font-family: 'Silkscreen', monospace;
+    font-size: 14px;
+    width: 160px;
+    outline: none;
+}
+#username-save {
+    background: #aad69c;
+    color: #1f242b;
+    border: none;
+    padding: 7px 14px;
+    font-family: 'Silkscreen', monospace;
+    font-weight: bold;
+    cursor: pointer;
+}
+#username-save:hover { background: #c9ebb9; }
+
+/*----------- Rotate warning ------------*/
+#rotate-warning {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #111;
+    color: #aad69c;
+    font-family: 'Silkscreen', monospace;
+    text-align: center;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    line-height: 1.6;
+    padding: 20px;
+}
+#username-bar-mobile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    font-family: 'Silkscreen', monospace;
+    color: #aad69c;
+}
+#username-bar-mobile label { font-size: 14px; }
+#username-input-mobile {
+    background: #2d3641;
+    color: #aad69c;
+    border: 2px solid #aad69c;
+    padding: 6px 10px;
+    font-family: 'Silkscreen', monospace;
+    font-size: 14px;
+    width: 160px;
+    outline: none;
+}
+#username-save-mobile {
+    background: #aad69c;
+    color: #1f242b;
+    border: none;
+    padding: 7px 14px;
+    font-family: 'Silkscreen', monospace;
+    font-weight: bold;
+    cursor: pointer;
+}
+.rotate-icon {
+    font-size: 4rem;
+    animation: rotateHint 1.6s ease-in-out infinite;
+    margin-bottom: 20px;
+}
+@keyframes rotateHint {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+}
+@media only screen and (orientation: portrait) and (max-width: 900px) {
+    #rotate-warning { display: flex; }
+}
+
 /*----------- Onscreen Buttons ------------*/
 .buttons-onscreen{
     display: none;
@@ -232,25 +335,62 @@ canvas {
     .controls{
         flex-direction: column;
     }
-    .button img{
-        width: 50px;
-        height: 50px;
-    }
+}
 
-    #button-left{
-        left: 10px;
-        bottom: 110px;
+/* Mobile landscape: fullscreen-ish canvas, fixed overlay buttons */
+@media only screen and (orientation: landscape) and (max-height: 500px) {
+    nav, #info, .toggle-container, #username-bar { display: none !important; }
+    body { background: #000; }
+    #game {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
-    #button-up{
-        left: 60px;
-        bottom: 160px;
+    canvas {
+        width: 100vw;
+        height: 100vh;
+        max-width: 100vw;
+        max-height: 100vh;
+        object-fit: contain;
+        left: 0;
+        transform: none;
     }
-    #button-right{
-        left: 110px;
-        bottom: 110px;
+    #canvas-bg { position: absolute; top: 0; left: 0; }
+    #canvas-main { position: relative; }
+    .buttons-onscreen {
+        display: block !important;
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 100;
     }
-    #button-down{
-        left: 60px;
-        bottom: 60px;
+    .buttons-onscreen .button {
+        position: fixed;
+        pointer-events: auto;
+        opacity: 0.65;
+    }
+    .button img {
+        width: 58px;
+        height: 58px;
+    }
+    /* D-pad bottom-left */
+    #button-left  { left: calc(10px + env(safe-area-inset-left));  bottom: calc(70px + env(safe-area-inset-bottom)); }
+    #button-right { left: calc(130px + env(safe-area-inset-left)); bottom: calc(70px + env(safe-area-inset-bottom)); }
+    #button-up    { left: calc(70px + env(safe-area-inset-left));  bottom: calc(130px + env(safe-area-inset-bottom)); }
+    #button-down  { left: calc(70px + env(safe-area-inset-left));  bottom: calc(10px + env(safe-area-inset-bottom)); }
+    /* Fire / Special bottom-right */
+    #button-fire  { right: calc(20px + env(safe-area-inset-right));  bottom: calc(70px + env(safe-area-inset-bottom)); }
+    #button-x     { right: calc(90px + env(safe-area-inset-right));  bottom: calc(130px + env(safe-area-inset-bottom)); }
+    #pause-button {
+        position: fixed;
+        top: calc(8px + env(safe-area-inset-top));
+        right: calc(8px + env(safe-area-inset-right));
+        left: auto;
+        transform: none;
+        font-size: 14px;
+        padding: 4px 10px;
+        z-index: 101;
     }
 }

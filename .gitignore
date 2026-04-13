@@ -1,0 +1,6 @@
+.vscode/
+.DS_Store
+node_modules/
+worker/.wrangler/
+worker/node_modules/
+*.log

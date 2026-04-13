@@ -84,10 +84,7 @@ class InputHandler {
                     keys.ArrowDown.pressed = true;
                     break;
                 case " ":
-                    if (!keys.space.pressed) {
-                        this.level.playerProjectiles.push(new Projectile(true, this.level.player));
-                        keys.space.pressed = true;
-                    }
+                    keys.space.pressed = true;
                     break;
                 case "X":
                 case "x":
@@ -179,10 +176,7 @@ class InputHandler {
         // firing button events
         buttonFire.addEventListener("pointerdown", ()=>{
             if (gameOver || !level.active || gamePause) return;
-            if (!keys.space.pressed) {
-                this.level.playerProjectiles.push(new Projectile(true, this.level.player));
-                keys.space.pressed = true;
-            }
+            keys.space.pressed = true;
         })
         buttonFire.addEventListener("pointerup", ()=>{
             keys.space.pressed = false;
@@ -313,6 +307,17 @@ class Player {
         if (keys.ArrowUp.pressed && this.y >= 50) this.y -= this.speedY;
         if (keys.ArrowDown.pressed && this.y <= mainCanvas.height - this.height) this.y += this.speedY;
         else this.y += 0;
+
+        // auto-fire while space / fire button held
+        if (keys.space.pressed && !gamePause && !gameOver) {
+            this.fireCooldown = (this.fireCooldown || 0) - deltaTime;
+            if (this.fireCooldown <= 0) {
+                this.level.playerProjectiles.push(new Projectile(true, this));
+                this.fireCooldown = 180; // ms between shots
+            }
+        } else {
+            this.fireCooldown = 0;
+        }
 
         this.draw();
     }
@@ -572,6 +577,7 @@ class Explosion {
         this.frameY = 8;
         if (isLevelDark) this.frameY = 9;
         this.delete = false;
+        if (typeof spawnBurst === "function") spawnBurst(x + 35, y + 35);
     }
     update() {
         if (this.frames % this.staggeredFrames === 0) {
@@ -1408,6 +1414,136 @@ for(let i = 0; i< 100; i++){
     particles.push(new Particle());
 }
 
+// ---------- Parallax star layers ----------
+class Star {
+    constructor(layer) {
+        this.layer = layer;
+        this.reset(true);
+    }
+    reset(initial) {
+        this.x = initial ? Math.random() * bgCanvas.width : bgCanvas.width + Math.random() * 40;
+        this.y = Math.random() * bgCanvas.height;
+        if (this.layer === 0) {
+            this.speed = 0.3;
+            this.radius = Math.random() * 0.9 + 0.2;
+            this.alpha = Math.random() * 0.5 + 0.2;
+        } else {
+            this.speed = 0.9;
+            this.radius = Math.random() * 1.4 + 0.6;
+            this.alpha = Math.random() * 0.6 + 0.4;
+        }
+        this.twinkle = Math.random() * Math.PI * 2;
+    }
+    update(deltaTime) {
+        this.x -= this.speed * (deltaTime || 16) * 0.06;
+        this.twinkle += 0.04;
+        if (this.x < -2) this.reset(false);
+    }
+    draw() {
+        const a = this.alpha * (0.75 + Math.sin(this.twinkle) * 0.25);
+        bgCtx.save();
+        bgCtx.globalAlpha = a;
+        bgCtx.fillStyle = isLevelDark ? "#cfe7ff" : "#ffffff";
+        bgCtx.beginPath();
+        bgCtx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        bgCtx.fill();
+        bgCtx.restore();
+    }
+}
+const starsFar = [];
+const starsNear = [];
+for (let i = 0; i < 70; i++) starsFar.push(new Star(0));
+for (let i = 0; i < 35; i++) starsNear.push(new Star(1));
+function drawParallax(deltaTime) {
+    if (isLevelDark) {
+        starsFar.forEach(s => { s.update(deltaTime); s.draw(); });
+        starsNear.forEach(s => { s.update(deltaTime); s.draw(); });
+    }
+}
+
+// ---------- FX particles (thruster / sparks / burst) ----------
+class FxParticle {
+    constructor(x, y, opts = {}) {
+        this.x = x;
+        this.y = y;
+        this.vx = opts.vx ?? (Math.random() - 0.5) * 2;
+        this.vy = opts.vy ?? (Math.random() - 0.5) * 2;
+        this.life = opts.life ?? 30;
+        this.maxLife = this.life;
+        this.radius = opts.radius ?? (Math.random() * 2 + 1);
+        this.color = opts.color ?? "#ffcc33";
+        this.gravity = opts.gravity ?? 0;
+        this.shrink = opts.shrink ?? 0.04;
+        this.delete = false;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += this.gravity;
+        this.life--;
+        this.radius = Math.max(0, this.radius - this.shrink);
+        if (this.life <= 0 || this.radius <= 0.1) this.delete = true;
+        this.draw();
+    }
+    draw() {
+        const a = Math.max(0, this.life / this.maxLife);
+        mainCtx.save();
+        mainCtx.globalAlpha = a;
+        mainCtx.fillStyle = this.color;
+        mainCtx.beginPath();
+        mainCtx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        mainCtx.fill();
+        mainCtx.restore();
+    }
+}
+const fxParticles = [];
+function spawnThruster(x, y) {
+    fxParticles.push(new FxParticle(x, y, {
+        vx: -1.8 - Math.random() * 1.2,
+        vy: (Math.random() - 0.5) * 0.6,
+        radius: Math.random() * 2 + 1.4,
+        life: 18,
+        color: Math.random() < 0.5 ? "#ff884d" : "#ffd24d",
+        shrink: 0.08
+    }));
+}
+function spawnSparks(x, y, count = 6, color = "#fff6a8") {
+    for (let i = 0; i < count; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = Math.random() * 2.5 + 0.8;
+        fxParticles.push(new FxParticle(x, y, {
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd,
+            radius: Math.random() * 1.6 + 0.8,
+            life: 20,
+            color,
+            shrink: 0.06
+        }));
+    }
+}
+function spawnBurst(x, y) {
+    // flash ring
+    fxParticles.push(new FxParticle(x, y, {
+        vx: 0, vy: 0, radius: 10, life: 10, color: "#ffffff", shrink: 1
+    }));
+    for (let i = 0; i < 18; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = Math.random() * 3.5 + 1;
+        fxParticles.push(new FxParticle(x, y, {
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd,
+            radius: Math.random() * 2.5 + 1.2,
+            life: Math.random() * 20 + 20,
+            color: ["#ff7733", "#ffb347", "#ffe066", "#ffffff"][Math.floor(Math.random() * 4)],
+            shrink: 0.05
+        }));
+    }
+}
+function updateFx() {
+    fxParticles.forEach(p => p.update());
+    for (let i = fxParticles.length - 1; i >= 0; i--) if (fxParticles[i].delete) fxParticles.splice(i, 1);
+}
+
 // Background classes
 class Background {
     constructor(level, frameX) {
@@ -1616,6 +1752,9 @@ class Level {
         }
     }
     update(deltaTime) {
+        // parallax stars behind everything
+        drawParallax(deltaTime);
+
         // ui draw
         this.ui.draw();
 
@@ -1651,6 +1790,7 @@ class Level {
                     enemy.hitbox.forEach(hb => {
                         if (checkCollision(hb, pp)) {
                             pp.delete = true;
+                            spawnSparks(pp.x, pp.y + pp.height * 0.5, 5);
                             if (!hb.immune) {
                                 enemy.hp -= 5;
                                 playerScore += 5;
@@ -1670,6 +1810,7 @@ class Level {
                     if (enemy.isPowerUp) pp.delete = true;
                     else {
                         pp.delete = true;
+                        spawnSparks(pp.x, pp.y + pp.height * 0.5, 5);
                         enemy.hp -= 10;
                         if (enemy.hp <= 0) {
                             this.explosions.push(new Explosion(enemy.x, enemy.y));
@@ -1826,6 +1967,9 @@ class Level {
         // explosions update
         this.explosions.forEach(explosion => explosion.update());
         this.explosions = this.explosions.filter(explosion => !explosion.delete);
+
+        // fx particles (thruster, sparks, bursts)
+        updateFx();
 
         // background and collision detection with player and projectiles
         this.background.forEach(bg => {
@@ -2853,6 +2997,64 @@ function checkCollision(rect1, rect2) {
         rect1.height + rect1.y > rect2.y);
 }
 
+// ---------- Leaderboard (Cloudflare Worker) ----------
+// Set your worker URL after deploying (see worker/README).
+const LEADERBOARD_URL = (window.LEADERBOARD_URL || "").replace(/\/$/, "");
+function getUsername() { return (localStorage.getItem("si_username") || "").trim(); }
+let gameStartTime = 0;
+let scoreSubmitted = false;
+let cachedLeaderboard = null;
+
+async function submitScore(name, score, timeMs) {
+    if (!LEADERBOARD_URL) return null;
+    try {
+        const res = await fetch(LEADERBOARD_URL + "/score", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: name, score, time: timeMs })
+        });
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (e) { return null; }
+}
+async function fetchLeaderboard() {
+    if (!LEADERBOARD_URL) return [];
+    try {
+        const res = await fetch(LEADERBOARD_URL + "/leaderboard");
+        if (!res.ok) return [];
+        return await res.json();
+    } catch (e) { return []; }
+}
+function formatTime(ms) {
+    const s = Math.floor(ms / 1000);
+    return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,"0")}`;
+}
+function drawLeaderboard(list) {
+    mainCtx.save();
+    mainCtx.fillStyle = "#aad69c";
+    mainCtx.textAlign = "center";
+    mainCtx.font = "bold 32px Silkscreen";
+    mainCtx.fillText("TOP SCORES", 420, 90);
+    mainCtx.font = "20px Silkscreen";
+    mainCtx.textAlign = "left";
+    if (!list || !list.length) {
+        mainCtx.textAlign = "center";
+        mainCtx.fillText("(no scores yet)", 420, 250);
+    } else {
+        list.slice(0, 10).forEach((e, i) => {
+            const y = 130 + i * 28;
+            const name = String(e.username || "???").slice(0, 12);
+            mainCtx.fillText((i+1).toString().padStart(2,"0"), 120, y);
+            mainCtx.fillText(name, 180, y);
+            mainCtx.textAlign = "right";
+            mainCtx.fillText(String(e.score).padStart(5,"0"), 560, y);
+            mainCtx.fillText(formatTime(e.time || 0), 680, y);
+            mainCtx.textAlign = "left";
+        });
+    }
+    mainCtx.restore();
+}
+
 let currentLevel = new Level(1, true);
 let lastTime = 0;    // previous time stamp
 const logo = document.getElementById("logo");
@@ -2865,19 +3067,30 @@ let newGame = false;
 function nextLevel(num, isDark) {
     currentLevel = new Level(num, isDark);
 }
+function maybeSubmitScore() {
+    if (scoreSubmitted) return;
+    scoreSubmitted = true;
+    const elapsed = Date.now() - gameStartTime;
+    submitScore(getUsername() || "anon", playerScore, elapsed).then(() => {
+        fetchLeaderboard().then(list => { cachedLeaderboard = list; });
+    });
+}
 function gameWin() {
     bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
     mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
     particles.forEach(particle => particle.update());
+    maybeSubmitScore();
 
     mainCtx.save();
     mainCtx.font = "bold 60px Silkscreen"
     bgCanvas.style.background = "#282828";
     mainCtx.textAlign = "center";
     mainCtx.fillStyle = "#aad69c";
-    mainCtx.fillText("You Win!", 420, 150);
-    mainCtx.fillText("High Score: " + playerScore.toString().padStart(5, "0"), 420, 250);
+    mainCtx.fillText("You Win!", 420, 60);
+    mainCtx.font = "bold 28px Silkscreen";
+    mainCtx.fillText(`${getUsername() || "anon"} — ${playerScore.toString().padStart(5,"0")} — ${formatTime(Date.now()-gameStartTime)}`, 420, 100);
     mainCtx.restore();
+    drawLeaderboard(cachedLeaderboard);
     exitButton.style.display = "block";
     pauseButton.style.visibility = "hidden";
 }
@@ -2885,17 +3098,18 @@ function gameLose() {
     bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
     mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
     particles.forEach(particle => particle.update());
+    maybeSubmitScore();
 
     mainCtx.save();
     bgCanvas.style.background = "#282828";
     mainCtx.fillStyle = "#aad69c";
-    mainCtx.font = "bold 60px Silkscreen"
+    mainCtx.font = "bold 48px Silkscreen"
     mainCtx.textAlign = "center";
-    mainCtx.fillText("Game Over!", 420, 120);
-    mainCtx.fillText("Score: " + playerScore.toString().padStart(5, "0"), 420, 220);
-    mainCtx.font = "bold 50px Silkscreen"
-    mainCtx.fillText("Better Luck Next Time", 420, 320);
+    mainCtx.fillText("Game Over", 420, 60);
+    mainCtx.font = "bold 24px Silkscreen";
+    mainCtx.fillText(`${getUsername() || "anon"} — ${playerScore.toString().padStart(5,"0")} — ${formatTime(Date.now()-gameStartTime)}`, 420, 100);
     mainCtx.restore();
+    drawLeaderboard(cachedLeaderboard);
     exitButton.style.display = "block";
     pauseButton.style.visibility = "hidden";
 }
@@ -2903,6 +3117,8 @@ function gameStart() {
     playButton.style.display = "none";
     pauseButton.style.visibility = "visible";
     isMainScreen = false;
+    gameStartTime = Date.now();
+    scoreSubmitted = false;
 }
 function mainScreen() {
     mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
@@ -2910,7 +3126,15 @@ function mainScreen() {
     particles.forEach(particle => particle.update());
     bgCanvas.style.background = "#282828";
     mainCtx.drawImage(logo, 0, 0, 1190, 430, 100, 100, 640, 245);
+    mainCtx.save();
+    mainCtx.fillStyle = "#aad69c";
+    mainCtx.textAlign = "center";
+    mainCtx.font = "bold 22px Silkscreen";
+    mainCtx.fillText(`Pilot: ${getUsername() || "(set username below)"}`, 420, 400);
+    mainCtx.restore();
 }
+// Prefetch leaderboard on load
+fetchLeaderboard().then(list => { cachedLeaderboard = list; });
 
 function animate(timestamp) {
     let deltaTime = timestamp - lastTime;
