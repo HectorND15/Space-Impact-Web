@@ -68,7 +68,9 @@ class InputHandler {
         this.level = level;
         // keyboard events
         window.addEventListener("keydown", (e) => {
-            e.preventDefault();  //prevents the page scrolling
+            const t = e.target;
+            if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+            if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," ","x","X"].includes(e.key)) e.preventDefault();
             if (gameOver || !level.active || gamePause) return;
             switch (e.key) {
                 case "ArrowLeft":
@@ -309,7 +311,7 @@ class Player {
         else this.y += 0;
 
         // auto-fire while space / fire button held
-        if (keys.space.pressed && !gamePause && !gameOver) {
+        if (keys.space.pressed && !gamePause && !gameOver && this.level && this.level.active) {
             this.fireCooldown = (this.fireCooldown || 0) - deltaTime;
             if (this.fireCooldown <= 0) {
                 this.level.playerProjectiles.push(new Projectile(true, this));

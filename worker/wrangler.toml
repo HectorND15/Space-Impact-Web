@@ -6,4 +6,4 @@ compatibility_date = "2024-10-01"
 #   wrangler kv namespace create LB
 [[kv_namespaces]]
 binding = "LB"
-id = "<KV_ID>"
+id = "b3c9a38f4e3d444a9db43a6f98b25bb0"
