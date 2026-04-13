@@ -63,15 +63,23 @@ let lives = 4;
 const maxLives = 7;
 let playerScore = 0;
 
+let _inputBound = false;
 class InputHandler {
     constructor(level) {
         this.level = level;
+        // bind listeners only once across level transitions
+        if (_inputBound) return;
+        _inputBound = true;
+        // reset keys if window loses focus (prevents stuck keys)
+        window.addEventListener("blur", () => {
+            Object.keys(keys).forEach(k => keys[k].pressed = false);
+        });
         // keyboard events
         window.addEventListener("keydown", (e) => {
             const t = e.target;
             if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
             if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," ","x","X"].includes(e.key)) e.preventDefault();
-            if (gameOver || !level.active || gamePause) return;
+            if (gameOver || !currentLevel.active || gamePause) return;
             switch (e.key) {
                 case "ArrowLeft":
                     keys.ArrowLeft.pressed = true;
@@ -93,11 +101,11 @@ class InputHandler {
                     if (!keys.x.pressed) {
                         if (specialCount > 0) {
                             switch (specialAtttack) {
-                                case "missile": this.level.playerSpecial.push(new Missile(this.level));
+                                case "missile": currentLevel.playerSpecial.push(new Missile(currentLevel));
                                     break;
-                                case "laser": this.level.playerSpecial.push(new Laser(this.level));
+                                case "laser": currentLevel.playerSpecial.push(new Laser(currentLevel));
                                     break;
-                                case "wall": this.level.playerSpecial.push(new Wall(this.level));
+                                case "wall": currentLevel.playerSpecial.push(new Wall(currentLevel));
                                     break;
                             }
                             specialCount--;
@@ -133,7 +141,7 @@ class InputHandler {
 
         // onscreen-buttons events
         buttonLeft.addEventListener("pointerdown", ()=>{
-            if (gameOver || !level.active || gamePause) return;
+            if (gameOver || !currentLevel.active || gamePause) return;
             keys.ArrowLeft.pressed = true;
         })
         buttonLeft.addEventListener("pointerup", ()=>{
@@ -144,7 +152,7 @@ class InputHandler {
         })
 
         buttonRight.addEventListener("pointerdown", ()=>{
-            if (gameOver || !level.active || gamePause) return;
+            if (gameOver || !currentLevel.active || gamePause) return;
             keys.ArrowRight.pressed = true;
         })
         buttonRight.addEventListener("pointerup", ()=>{
@@ -155,7 +163,7 @@ class InputHandler {
         })
 
         buttonUp.addEventListener("pointerdown", ()=>{
-            if (gameOver || !level.active || gamePause) return;
+            if (gameOver || !currentLevel.active || gamePause) return;
             keys.ArrowUp.pressed = true;
         })
         buttonUp.addEventListener("pointerup", ()=>{
@@ -166,7 +174,7 @@ class InputHandler {
         })
 
         buttonDown.addEventListener("pointerdown", ()=>{
-            if (gameOver || !level.active || gamePause) return;
+            if (gameOver || !currentLevel.active || gamePause) return;
             keys.ArrowDown.pressed = true;
         })
         buttonDown.addEventListener("pointerup", ()=>{
@@ -177,7 +185,7 @@ class InputHandler {
         })
         // firing button events
         buttonFire.addEventListener("pointerdown", ()=>{
-            if (gameOver || !level.active || gamePause) return;
+            if (gameOver || !currentLevel.active || gamePause) return;
             keys.space.pressed = true;
         })
         buttonFire.addEventListener("pointerup", ()=>{
@@ -188,15 +196,15 @@ class InputHandler {
         })
 
         buttonX.addEventListener("pointerdown", ()=>{
-            if (gameOver || !level.active || gamePause) return;
+            if (gameOver || !currentLevel.active || gamePause) return;
             if (!keys.x.pressed) {
                 if (specialCount > 0) {
                     switch (specialAtttack) {
-                        case "missile": this.level.playerSpecial.push(new Missile(this.level));
+                        case "missile": currentLevel.playerSpecial.push(new Missile(currentLevel));
                             break;
-                        case "laser": this.level.playerSpecial.push(new Laser(this.level));
+                        case "laser": currentLevel.playerSpecial.push(new Laser(currentLevel));
                             break;
-                        case "wall": this.level.playerSpecial.push(new Wall(this.level));
+                        case "wall": currentLevel.playerSpecial.push(new Wall(currentLevel));
                             break;
                     }
                     specialCount--;
@@ -1411,8 +1419,10 @@ class Particle {
         bgCtx.restore();
     }
 }
+const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.matchMedia("(max-width: 900px)").matches;
 const particles = [];
-for(let i = 0; i< 100; i++){
+const particleCount = isMobile ? 40 : 100;
+for(let i = 0; i< particleCount; i++){
     particles.push(new Particle());
 }
 
@@ -1454,8 +1464,10 @@ class Star {
 }
 const starsFar = [];
 const starsNear = [];
-for (let i = 0; i < 70; i++) starsFar.push(new Star(0));
-for (let i = 0; i < 35; i++) starsNear.push(new Star(1));
+const starFarCount = isMobile ? 28 : 70;
+const starNearCount = isMobile ? 14 : 35;
+for (let i = 0; i < starFarCount; i++) starsFar.push(new Star(0));
+for (let i = 0; i < starNearCount; i++) starsNear.push(new Star(1));
 function drawParallax(deltaTime) {
     if (isLevelDark) {
         starsFar.forEach(s => { s.update(deltaTime); s.draw(); });
@@ -1510,6 +1522,7 @@ function spawnThruster(x, y) {
     }));
 }
 function spawnSparks(x, y, count = 6, color = "#fff6a8") {
+    if (isMobile) count = Math.ceil(count / 2);
     for (let i = 0; i < count; i++) {
         const ang = Math.random() * Math.PI * 2;
         const spd = Math.random() * 2.5 + 0.8;
@@ -1528,7 +1541,8 @@ function spawnBurst(x, y) {
     fxParticles.push(new FxParticle(x, y, {
         vx: 0, vy: 0, radius: 10, life: 10, color: "#ffffff", shrink: 1
     }));
-    for (let i = 0; i < 18; i++) {
+    const burstCount = isMobile ? 8 : 18;
+    for (let i = 0; i < burstCount; i++) {
         const ang = Math.random() * Math.PI * 2;
         const spd = Math.random() * 3.5 + 1;
         fxParticles.push(new FxParticle(x, y, {
@@ -3139,8 +3153,10 @@ function mainScreen() {
 fetchLeaderboard().then(list => { cachedLeaderboard = list; });
 
 function animate(timestamp) {
-    let deltaTime = timestamp - lastTime;
+    let deltaTime = lastTime === 0 ? 16 : timestamp - lastTime;
     lastTime = timestamp;
+    // Clamp deltaTime to avoid physics/spawn spikes on tab-switch or slow first frame
+    if (deltaTime > 50) deltaTime = 50;
 
     if (isMainScreen) mainScreen();
     else if (!gamePause && !gameOver) {
